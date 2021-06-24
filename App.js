@@ -1,112 +1,92 @@
-/**
- * Sample React Native App
- * https://github.com/facebook/react-native
- *
- * @format
- * @flow strict-local
- */
-
-import React from 'react';
-import type {Node} from 'react';
+import React, { useState, useMemo } from 'react';
 import {
-  SafeAreaView,
-  ScrollView,
-  StatusBar,
   StyleSheet,
   Text,
-  useColorScheme,
   View,
+  TextInput,
+  KeyboardAvoidingView,
+  FlatList,
 } from 'react-native';
+import { createConsumer } from '@rails/actioncable';
 
-import {
-  Colors,
-  DebugInstructions,
-  Header,
-  LearnMoreLinks,
-  ReloadInstructions,
-} from 'react-native/Libraries/NewAppScreen';
+global.addEventListener = () => {};
+global.removeEventListener = () => {};
 
-const Section = ({children, title}): Node => {
-  const isDarkMode = useColorScheme() === 'dark';
-  return (
-    <View style={styles.sectionContainer}>
-      <Text
-        style={[
-          styles.sectionTitle,
-          {
-            color: isDarkMode ? Colors.white : Colors.black,
-          },
-        ]}>
-        {title}
-      </Text>
-      <Text
-        style={[
-          styles.sectionDescription,
-          {
-            color: isDarkMode ? Colors.light : Colors.dark,
-          },
-        ]}>
-        {children}
-      </Text>
-    </View>
-  );
-};
+const URL = 'ws://c8d1e1764cf3.ngrok.io/api/v1/cable'
+const consumer = createConsumer(URL);
 
-const App: () => Node = () => {
-  const isDarkMode = useColorScheme() === 'dark';
+const styles = StyleSheet.create({
+  container: {
+    paddingTop: 25,
+    height: '100%',
+  },
+  messages: {
+    flex: 1,
+  },
+  message: {
+    borderColor: 'gray',
+    borderBottomWidth: 1,
+    borderTopWidth: 1,
+    padding: 8,
+  },
+  form: {
+    backgroundColor: '#eee',
+    paddingHorizontal: 10,
+    paddingTop: 10,
+    paddingBottom: 75,
+  },
+  input: {
+    height: 40,
+    borderColor: 'gray',
+    borderWidth: 1,
+    backgroundColor: 'white',
+  },
+});
 
-  const backgroundStyle = {
-    backgroundColor: isDarkMode ? Colors.darker : Colors.lighter,
+const Message = ({ message }) => (
+  <View style={styles.message}>
+    <Text style={styles.message}>{message}</Text>
+  </View>
+);
+
+const App = () => {
+  const [value, setValue] = useState('');
+  const [messages, setMessages] = useState([]);
+  const chatChannel = useMemo(() => {
+    return consumer.subscriptions.create({ channel: 'TestChannel', room: 'main_room' }, {
+      received(data) {
+        setMessages(messages => messages.concat(data.content));
+      },
+    });
+  }, []);
+
+  const renderedItem = ({ item }) => (<Message message={item.message} key={item.key} />);
+  const inputSubmitted = (event) => {
+    const newMessage = event.nativeEvent.text;
+    chatChannel.send({ message: newMessage });
+    setValue('');
   };
 
   return (
-    <SafeAreaView style={backgroundStyle}>
-      <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
-      <ScrollView
-        contentInsetAdjustmentBehavior="automatic"
-        style={backgroundStyle}>
-        <Header />
-        <View
-          style={{
-            backgroundColor: isDarkMode ? Colors.black : Colors.white,
-          }}>
-          <Section title="Step One">
-            Edit <Text style={styles.highlight}>App.js</Text> to change this
-            screen and then come back to see your edits.
-          </Section>
-          <Section title="See Your Changes">
-            <ReloadInstructions />
-          </Section>
-          <Section title="Debug">
-            <DebugInstructions />
-          </Section>
-          <Section title="Learn More">
-            Read the docs to discover what to do next:
-          </Section>
-          <LearnMoreLinks />
-        </View>
-      </ScrollView>
-    </SafeAreaView>
+    <KeyboardAvoidingView style={styles.container} behavior="height">
+      <FlatList
+        styles={styles.messages}
+        data={messages}
+        renderItem={renderedItem}
+        keyExtractor={(item) => item.key}
+      />
+
+      <View style={styles.form}>
+        <TextInput
+          style={styles.input}
+          onChangeText={text => setValue(text)}
+          value={value}
+          placeholder="Type a Message"
+          onSubmitEditing={inputSubmitted}
+        />
+      </View>
+    </KeyboardAvoidingView>
   );
 };
-
-const styles = StyleSheet.create({
-  sectionContainer: {
-    marginTop: 32,
-    paddingHorizontal: 24,
-  },
-  sectionTitle: {
-    fontSize: 24,
-    fontWeight: '600',
-  },
-  sectionDescription: {
-    marginTop: 8,
-    fontSize: 18,
-    fontWeight: '400',
-  },
-  highlight: {
-    fontWeight: '700',
-  },
-});
 
 export default App;
